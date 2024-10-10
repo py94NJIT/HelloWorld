@@ -58,6 +58,7 @@ class BestSellerBooksFragment : Fragment(), OnListFragmentInteractionListener {
         val params = RequestParams()
         params["api-key"] = API_KEY
 
+
         // Using the client, perform the HTTP request
         client[
             "https://api.nytimes.com/svc/books/v3/lists/current/hardcover-fiction.json",
