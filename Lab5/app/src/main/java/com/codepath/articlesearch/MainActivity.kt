@@ -3,12 +3,15 @@ package com.codepath.articlesearch
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.codepath.articlesearch.databinding.ActivityMainBinding
 import com.codepath.asynchttpclient.AsyncHttpClient
 import com.codepath.asynchttpclient.callback.JsonHttpResponseHandler
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import okhttp3.Headers
@@ -46,6 +49,22 @@ class MainActivity : AppCompatActivity() {
             val dividerItemDecoration = DividerItemDecoration(this, it.orientation)
             articlesRecyclerView.addItemDecoration(dividerItemDecoration)
         }
+        lifecycleScope.launch {
+            (application as ArticleApplication).db.articleDao().getAll().collect { databaseList ->
+                databaseList.map { entity ->
+                    DisplayArticle(
+                        entity.headline,
+                        entity.articleAbstract,
+                        entity.byline,
+                        entity.mediaImageUrl
+                    )
+                }.also { mappedList ->
+                    articles.clear()
+                    articles.addAll(mappedList)
+                    articleAdapter.notifyDataSetChanged()
+                }
+            }
+        }
 
         // Make the network request to fetch the articles
         val client = AsyncHttpClient()
@@ -68,8 +87,17 @@ class MainActivity : AppCompatActivity() {
 
                     // Add articles to the list and notify the adapter
                     parsedJson.response?.docs?.let { list ->
-                        //articles.addAll(list)
-                        articleAdapter.notifyDataSetChanged()
+                        lifecycleScope.launch(IO) {
+                            (application as ArticleApplication).db.articleDao().deleteAll()
+                            (application as ArticleApplication).db.articleDao().insertAll(list.map {
+                                ArticleEntity(
+                                    headline = it.headline?.main,
+                                    articleAbstract = it.abstract,
+                                    byline = it.byline?.original,
+                                    mediaImageUrl = it.mediaImageUrl
+                                )
+                            })
+                        }
                     }
 
                 } catch (e: JSONException) {
